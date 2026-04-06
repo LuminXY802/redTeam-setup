@@ -17,13 +17,13 @@ This project is fully automated via **Ansible**. To set up the Red Team Jump Box
 
 1.  **Clone the Repository:**
     ```bash
-    git clone [Your-GitHub-Link]
+    git clone https://github.com/LuminXY802/redTeam-setup
     cd RedTeam-Tools
     ```
 
 2.  **Run the Playbook:**
     ```bash
-    ansible-playbook site.yml --ask-become-pass
+    ansible-playbook setup-redteam.yml --ask-become-pass
     ```
 
 3.  **Verify Setup:**
