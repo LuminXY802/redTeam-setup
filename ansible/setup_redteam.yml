@@ -7,13 +7,13 @@
     tools_dir: "/opt/red-tools"
     frostbite_dir: "{{ tools_dir }}/frostbite-agent"
     A_poc: "https://github.com/A-poc/RedTeam-Tools"
+    dns_secret: "HW4_Secret_2026"
 
   tasks:
-
     # -----------------------------
-    # System Setup
+    # 1. System & Dependency Setup
     # -----------------------------
-    - name: Install dependencies
+    - name: Install core dependencies
       apt:
         update_cache: yes
         name:
@@ -21,39 +21,34 @@
           - curl
           - wget
           - build-essential
-          - mingw-w64
           - ruby-full
-          - proxychains4
-          - nmap
           - python3
           - python3-pip
           - netcat-openbsd
-#          - golang
+          - jq        # Critical for beautifying Frostbite JSON
+          - tmux      # Critical for managing multiple listeners
+          - ufw       # To manage the firewall
         state: present
 
-    - name: Create tools directory
+    - name: Create tools directory structure
       file:
-        path: "{{ tools_dir }}"
+        path: "{{ item }}"
         state: directory
         mode: '0755'
+      loop:
+        - "{{ tools_dir }}"
+        - "{{ frostbite_dir }}"
 
     # -----------------------------
-    # Install Sliver
+    # 2. Install Sliver C2
     # -----------------------------
     - name: Install Sliver C2 Server
       shell: "curl https://sliver.sh/install | bash"
       args:
         creates: /usr/local/bin/sliver-server
 
-    - name: Ensure Sliver server binary is in /usr/local/bin
-      file:
-        src: /opt/sliver/build/sliver-server
-        dest: /usr/local/bin/sliver-server
-        state: link
-        force: yes
-
     # -----------------------------
-    # Install dnscat2
+    # 3. Install dnscat2 (Server)
     # -----------------------------
     - name: Clone dnscat2
       git:
@@ -65,55 +60,24 @@
         name: bundler
         state: present
 
-    - name: Install dnscat2 dependencies
+    - name: Install dnscat2 server dependencies
       command: bundle install
       args:
         chdir: "{{ tools_dir }}/dnscat2/server"
 
     # -----------------------------
-    # Clone A-poc repo
+    # 4. Deploy Frostbite Agent
     # -----------------------------
-    - name: Clone RedTeam-Tools repo
-      git:
-        repo: "{{ A_poc }}"
-        dest: "{{ tools_dir }}/A-poc-tools"
-
-    # -----------------------------
-    # Deploy Frostbite Agent
-    # -----------------------------
-    - name: Copy Frostbite Agent
+    - name: Copy Frostbite Agent files
       copy:
         src: frostbite-agent/   
-        dest: "{{ frostbite_dir }}"
-        mode: '0755'
-
-    - name: Make Frostbite executable
-      file:
-        path: "{{ frostbite_dir }}/frostbite_agent.py"
+        dest: "{{ frostbite_dir }}/"
         mode: '0755'
 
     # -----------------------------
-    # Persistence (optional)
+    # 5. Create Operational Commands (The "Global" Tools)
     # -----------------------------
-    # - name: Install Frostbite cron job
-    #   cron:
-    #     name: "Frostbite Agent"
-    #     job: "python3 {{ frostbite_dir }}/frostbite_agent.py"
-    #     minute: "*/5"
-
-    # -----------------------------
-    # Install LinPEAS
-    # -----------------------------
-    - name: Download LinPEAS
-      get_url:
-        url: "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh"
-        dest: "{{ tools_dir }}/linpeas.sh"
-        mode: '0755'
-
-    # -----------------------------
-    # Create Global Commands
-    # -----------------------------
-    - name: Create frostbite command
+    - name: Create 'frostbite' command
       copy:
         dest: /usr/local/bin/frostbite
         mode: '0755'
@@ -121,64 +85,64 @@
           #!/bin/bash
           python3 {{ frostbite_dir }}/frostbite_agent.py
 
-    - name: Create situational awareness command
-      copy:
-        dest: /usr/local/bin/situational_awareness
-        mode: '0755'
-        content: |
-          #!/bin/bash
-          bash {{ tools_dir }}/linpeas.sh
-
-    - name: Create dnscat2 command
+    - name: Create 'call_moscow' command (dnscat2)
       copy:
         dest: /usr/local/bin/call_moscow
         mode: '0755'
         content: |
           #!/bin/bash
-          ruby {{ tools_dir }}/dnscat2/server/dnscat2.rb
+          # Stop system resolver to free up Port 53
+          sudo systemctl stop systemd-resolved
+          sudo ruby {{ tools_dir }}/dnscat2/server/dnscat2.rb --dns "port=53" --secret={{ dns_secret }}
 
-    - name: Create score_goal command
+    - name: Create 'view_loot' command (The Catcher)
       copy:
-        dest: /usr/local/bin/score_goal
+        dest: /usr/local/bin/view_loot
         mode: '0755'
         content: |
           #!/bin/bash
-          /root/sliver-server
+          echo "[*] Cold War Loot Listener Active on Port 443..."
+          sudo nc -lk -p 443 | jq .
 
     # -----------------------------
-    # ZSH Aliases
+    # 6. Configuration & Quality of Life
     # -----------------------------
-    - name: Add aliases to .zshrc
+    - name: Add aliases to .zshrc and .bashrc
       lineinfile:
-        path: "~/.zshrc"
-        line: "{{ item }}"
+        path: "{{ item }}"
+        line: "{{ alias_item }}"
         create: yes
       loop:
-        - "alias score_goal='/usr/local/bin/sliver-server'"
-        - "alias frostbite='/usr/local/bin/frostbite'"
-        - "alias situational_awareness='/usr/local/bin/situational_awareness'"
-        - "alias call_moscow='/usr/local/bin/call_moscow'"
+        - "~/.zshrc"
+        - "~/.bashrc"
+      vars:
+        alias_item: |
+          alias score_goal='/usr/local/bin/sliver-server'
+          alias frostbite='/usr/local/bin/frostbite'
+          alias call_moscow='/usr/local/bin/call_moscow'
+          alias view_loot='/usr/local/bin/view_loot'
 
-    # -----------------------------
-    # MOTD
-    # -----------------------------
-    - name: Set MOTD
+    - name: Set Cold War MOTD
       copy:
         dest: /etc/motd
         content: |
           ==================================================
           RED TEAM OPERATIONAL HUB - LAKE PLACID 1980
-          Frostbite Agent: ACTIVE
-          Sliver C2: READY
-          Backup Channel: dnscat2
+          --------------------------------------------------
+          COMMANDS:
+            score_goal     -> Launch Sliver C2
+            view_loot      -> Catch Frostbite Exfiltration
+            call_moscow    -> Start DNS Fallback Listener
+            frostbite      -> Run Local Agent Test
           ==================================================
 
-    # -----------------------------
-    # Permissions
-    # -----------------------------
-    - name: Fix ownership
-      file:
-        path: "{{ tools_dir }}"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
-        recurse: yes
+    - name: Open Firewall Ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: any
+      loop:
+        - '443'
+        - '80'
+        - '53'
+        - '8888' # mTLS Default
