@@ -1,0 +1,165 @@
+---
+- name: Setup Cold War Red Team Jump Box
+  hosts: practice
+  become: true
+
+  vars:
+    tools_dir: "/opt/red-tools"
+    frostbite_dir: "{{ tools_dir }}/frostbite-agent"
+    A_poc: "https://github.com/A-poc/RedTeam-Tools"
+
+  tasks:
+
+    # -----------------------------
+    # System Setup
+    # -----------------------------
+    - name: Install dependencies
+      apt:
+        update_cache: yes
+        name:
+          - git
+          - curl
+          - wget
+          - build-essential
+          - mingw-w64
+          - ruby-full
+          - proxychains4
+          - nmap
+          - python3
+          - python3-pip
+          - netcat-openbsd
+        state: present
+
+    - name: Create tools directory
+      file:
+        path: "{{ tools_dir }}"
+        state: directory
+        mode: '0755'
+
+    # -----------------------------
+    # Install Sliver
+    # -----------------------------
+    - name: Install Sliver C2 Server
+      shell: "curl https://sliver.sh/install | bash"
+      args:
+        creates: /usr/local/bin/sliver-server
+
+    # -----------------------------
+    # Install dnscat2
+    # -----------------------------
+    - name: Clone dnscat2
+      git:
+        repo: "https://github.com/iagox86/dnscat2.git"
+        dest: "{{ tools_dir }}/dnscat2"
+
+    - name: Install dnscat2 dependencies
+      shell: |
+        gem install bundler
+        bundle install
+      args:
+        chdir: "{{ tools_dir }}/dnscat2/server"
+
+    # -----------------------------
+    # Clone A-poc repo
+    # -----------------------------
+    - name: Clone RedTeam-Tools repo
+      git:
+        repo: "{{ A_poc }}"
+        dest: "{{ tools_dir }}/A-poc-tools"
+
+    # -----------------------------
+    # Deploy Frostbite Agent
+    # -----------------------------
+    - name: Copy Frostbite Agent
+      copy:
+        src: frostbite-agent/
+        dest: "{{ frostbite_dir }}"
+        mode: '0755'
+
+    - name: Make Frostbite executable
+      file:
+        path: "{{ frostbite_dir }}/frostbite_agent.py"
+        mode: '0755'
+
+    # -----------------------------
+    # Persistence
+    # -----------------------------
+    - name: Install Frostbite cron job
+      cron:
+        name: "Frostbite Agent"
+        job: "python3 {{ frostbite_dir }}/frostbite_agent.py"
+        minute: "*/5"
+
+    # -----------------------------
+    # Install LinPEAS
+    # -----------------------------
+    - name: Download LinPEAS
+      get_url:
+        url: "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh"
+        dest: "{{ tools_dir }}/linpeas.sh"
+        mode: '0755'
+
+    # -----------------------------
+    # Create Global Commands 
+    # -----------------------------
+    - name: Create frostbite command
+      copy:
+        dest: /usr/local/bin/frostbite
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          python3 {{ frostbite_dir }}/frostbite_agent.py
+
+    - name: Create situational awareness command
+      copy:
+        dest: /usr/local/bin/situational_awareness
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          bash {{ tools_dir }}/linpeas.sh
+
+    - name: Create dnscat2 command
+      copy:
+        dest: /usr/local/bin/call_moscow
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          ruby {{ tools_dir }}/dnscat2/server/dnscat2.rb
+
+    # -----------------------------
+    # ZSH Aliases 
+    # -----------------------------
+    - name: Add aliases to .zshrc
+      lineinfile:
+        path: "/home/kali/.zshrc"
+        line: "{{ item }}"
+        create: yes
+      loop:
+        - "alias score_goal='sliver-server'"
+        - "alias frostbite='frostbite'"
+        - "alias situational_awareness='situational_awareness'"
+        - "alias call_moscow='call_moscow'"
+
+    # -----------------------------
+    # MOTD
+    # -----------------------------
+    - name: Set MOTD
+      copy:
+        dest: /etc/motd
+        content: |
+          ==================================================
+          RED TEAM OPERATIONAL HUB - LAKE PLACID 1980
+          Frostbite Agent: ACTIVE
+          Sliver C2: READY
+          Backup Channel: dnscat2
+          ==================================================
+
+    # -----------------------------
+    # Permissions
+    # -----------------------------
+    - name: Fix ownership
+      file:
+        path: "{{ tools_dir }}"
+        owner: kali
+        group: kali
+        recurse: yes

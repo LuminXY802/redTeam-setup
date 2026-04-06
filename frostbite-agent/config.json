@@ -1,0 +1,7 @@
+{
+  "modules": {
+    "recon": true,
+    "creds": true,
+    "persist": true
+  }
+}
