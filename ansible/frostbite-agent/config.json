@@ -1,0 +1,17 @@
+{	
+  "c2":{
+    "host": "192.168.56.101",
+    "port": 443
+  },
+  "dnsc2":{
+    "host": "192.168.56.101",
+    "port": 53
+  },
+
+  "modules": {
+    "recon": true,
+    "creds": true,
+    "persist": true
+  }
+}
+
