@@ -7,7 +7,7 @@
     tools_dir: "/opt/red-tools"
     frostbite_dir: "{{ tools_dir }}/frostbite-agent"
     A_poc: "https://github.com/A-poc/RedTeam-Tools"
-    dns_secret: "HW4_Secret_2026"
+    dns_secret: "testSecret"
 
   tasks:
     # -----------------------------
@@ -25,9 +25,9 @@
           - python3
           - python3-pip
           - netcat-openbsd
-          - jq        # Critical for beautifying Frostbite JSON
-          - tmux      # Critical for managing multiple listeners
-          - ufw       # To manage the firewall
+          - jq
+          - tmux
+          - ufw
         state: present
 
     - name: Create tools directory structure
