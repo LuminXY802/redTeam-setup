@@ -3,7 +3,7 @@
 # Overview
 Project Frostbite is a Red Team infrastructure suite I built for the “Cold War” competition environment. The goal was to bridge the gap between getting initial access and actually maintaining it, without having to manually piece everything together mid-comp.
 
-Instead of relying on a bunch of separate tools, this setup combines automated situational awareness with a more flexible exfiltration approach. The idea is simple: get in, figure out what works for outbound traffic, and make sure you can always get data back out—even if things start getting blocked.
+Instead of relying on a bunch of separate tools, this setup combines automated situational awareness with a more flexible exfiltration approach. The idea is simple: get in, figure out what works for outbound traffic, and make sure you can always get data back out, even if things start getting blocked.
 
 ### Core Components:
 1. **Frostbite Agent:** A modular Python3 agent that pulls useful artifacts like SSH keys and `.bash_history` right away.
